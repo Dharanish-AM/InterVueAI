@@ -1,35 +1,73 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from "react";
+import { Provider } from "react-redux";
+import { PersistGate } from "redux-persist/integration/react";
+import { ConfigProvider, Tabs, Spin } from "antd";
+import { UserOutlined, TeamOutlined } from "@ant-design/icons";
+import { store, persistor } from "./redux/store";
+import Interviewee from "./pages/Interviewee";
+import Interviewer from "./pages/Interviewer";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const items = [
+    {
+      key: "interviewee",
+      label: (
+        <span className="flex items-center space-x-2 px-4">
+          <UserOutlined />
+          <span>Interviewee</span>
+        </span>
+      ),
+      children: <Interviewee />,
+    },
+    {
+      key: "interviewer",
+      label: (
+        <span className="flex items-center space-x-2 px-4">
+          <TeamOutlined />
+          <span>Interviewer Dashboard</span>
+        </span>
+      ),
+      children: <Interviewer />,
+    },
+  ];
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Provider store={store}>
+      <PersistGate
+        loading={
+          <div className="flex items-center justify-center h-screen">
+            <Spin size="large" />
+          </div>
+        }
+        persistor={persistor}
+      >
+        <ConfigProvider
+          theme={{
+            token: {
+              colorPrimary: "#1890ff",
+              borderRadius: 8,
+              fontSize: 14,
+            },
+          }}
+        >
+          <div className="min-h-screen bg-gray-50">
+            <Tabs
+              defaultActiveKey="interviewee"
+              centered
+              size="large"
+              className="bg-white shadow-sm"
+              tabBarStyle={{
+                margin: 0,
+                padding: "0 24px",
+                borderBottom: "1px solid #f0f0f0",
+              }}
+              items={items}
+            />
+          </div>
+        </ConfigProvider>
+      </PersistGate>
+    </Provider>
+  );
 }
 
-export default App
+export default App;
