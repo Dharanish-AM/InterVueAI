@@ -1,103 +1,140 @@
-// backend/server.js
 const express = require("express");
 const cors = require("cors");
-const sanityClient = require("@sanity/client");
-require("dotenv").config();
+const axios = require("axios");
+const dotenv = require("dotenv");
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configure Sanity/GROQ client
-const client = sanityClient({
-  projectId: process.env.SANITY_PROJECT_ID,
-  dataset: process.env.SANITY_DATASET || "production",
-  apiVersion: "2025-09-28", // use today’s date
-  token: process.env.SANITY_API_TOKEN, // optional if read-only
-  useCdn: false,
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+// Middleware to check API key if needed
+app.use((req, res, next) => {
+  // Optional API key check here
+  next();
 });
 
-// POST /api/generate-questions
+// POST /generate-questions
 app.post("/api/generate-questions", async (req, res) => {
   const { role } = req.body;
   try {
-    const query = `*[_type == "interviewQuestion" && role == $role]{
-      question,
-      difficulty
-    } | order(difficulty asc)`;
-    const questions = await client.fetch(query, { role });
+    const prompt = `Generate 6 interview questions for a ${role} role. 2 easy, 2 medium, 2 hard. Return JSON array [{"question":"...","difficulty":"easy/medium/hard","correctAnswer":"..."}]`;
 
-    const formatted = questions.map((q, index) => ({
-      id: index + 1,
-      question: q.question,
-      difficulty: q.difficulty,
-      timeLimit:
-        q.difficulty === "easy" ? 20 : q.difficulty === "medium" ? 60 : 120,
-    }));
+    const response = await axios.post(
+      GROQ_API_URL,
+      {
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+      }
+    );
 
-    res.json(formatted.slice(0, 6)); // take 6 questions
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch questions from GROQ" });
+    let content = response.data.choices[0].message.content;
+    content = content.replace(/```json|```/g, "").trim();
+
+    let questions;
+    try {
+      questions = JSON.parse(content).map((q, index) => ({
+        id: index + 1,
+        ...q,
+        timeLimit:
+          q.difficulty === "easy" ? 20 : q.difficulty === "medium" ? 60 : 120,
+      }));
+    } catch {
+      questions = Array.from({ length: 6 }, (_, i) => ({
+        id: i + 1,
+        question: content,
+        difficulty: "unknown",
+        correctAnswer: "",
+        timeLimit: 60,
+      }));
+    }
+
+    res.json(questions);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to generate questions" });
   }
 });
 
-// POST /api/score-answer
+// POST /score-answer
 app.post("/api/score-answer", async (req, res) => {
   const { question, answer, difficulty } = req.body;
   try {
-    // Fetch model answer from GROQ
-    const query = `*[_type == "interviewQuestion" && question == $question][0]{
-      correctAnswer
-    }`;
-    const qData = await client.fetch(query, { question });
+    const prompt = `Question: ${question}
+Answer: ${answer}
+Difficulty: ${difficulty}
+Score this answer from 0-10 and provide detailed feedback.
+Return JSON: {"score": number, "feedback": "text"}`;
 
-    // Simple scoring: exact match or partial match
-    let score = 0;
-    let feedback = "Answer could be improved.";
-    if (!qData?.correctAnswer) {
-      score = 5;
-      feedback = "No reference answer found, score is neutral.";
-    } else if (
-      answer.toLowerCase().includes(qData.correctAnswer.toLowerCase())
-    ) {
-      score = 10;
-      feedback = "Excellent answer!";
-    } else {
-      score = 6;
-      feedback = "Partial answer, consider including more details.";
+    const response = await axios.post(
+      GROQ_API_URL,
+      {
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+      }
+    );
+
+    let data;
+    try {
+      data = JSON.parse(response.data.choices[0].message.content);
+    } catch {
+      data = { score: 5, feedback: response.data.choices[0].message.content };
     }
+    data.timestamp = new Date().toISOString();
 
-    res.json({ score, feedback });
-  } catch (err) {
-    console.error(err);
+    res.json(data);
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Failed to score answer" });
   }
 });
 
-// POST /api/generate-summary
+// POST /generate-summary
 app.post("/api/generate-summary", async (req, res) => {
   const { candidate, answers } = req.body;
   try {
-    const avgScore =
-      answers.reduce((sum, ans) => sum + ans.score, 0) / answers.length;
-    let summary = "";
-    if (avgScore >= 8) {
-      summary = `${candidate.name} is an exceptional candidate with strong technical knowledge. Highly recommended.`;
-    } else if (avgScore >= 6) {
-      summary = `${candidate.name} is a solid candidate with good understanding of concepts. Shows potential.`;
-    } else if (avgScore >= 4) {
-      summary = `${candidate.name} has basic knowledge but may need additional support.`;
-    } else {
-      summary = `${candidate.name} needs significant improvement before being considered.`;
-    }
+    const prompt = `Candidate: ${candidate.name} (${candidate.email})
+Answers: ${JSON.stringify(answers)}
+Provide a concise summary of the candidate's performance and suitability for the role.
+Return as plain text.`;
 
+    const response = await axios.post(
+      GROQ_API_URL,
+      {
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+      }
+    );
+
+    const summary = response.data.choices[0].message.content;
     res.json({ summary });
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Failed to generate summary" });
   }
 });
 
-const PORT = process.env.PORT || 8000;
+const PORT = 8000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
