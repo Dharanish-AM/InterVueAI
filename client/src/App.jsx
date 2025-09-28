@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
-import { ConfigProvider, Tabs, Spin, message } from "antd";
+import { ConfigProvider, Tabs, Spin } from "antd";
 import { UserOutlined, TeamOutlined } from "@ant-design/icons";
 import { store, persistor } from "./redux/store";
 import Interviewee from "./pages/Interviewee";
@@ -12,19 +12,15 @@ function App() {
   const [apiReady, setApiReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
-  console.log("Using API URL:", API_URL);
 
   const checkApi = async () => {
     try {
-      const response = await axios.get(`${API_URL}/health`); // Replace with your test route
+      const response = await axios.get(`${API_URL}/health`);
       if (response.status === 200) {
         setApiReady(true);
-      } else {
-        message.error("API not available. Please try again later.");
       }
     } catch (error) {
-      console.error("API check failed:", error);
-      message.error("API not reachable. Please check your connection or try later.");
+      // do nothing, keep loader
     } finally {
       setLoading(false);
     }
@@ -77,11 +73,11 @@ function App() {
           }}
         >
           <div className="min-h-screen bg-gray-50">
-            {loading ? (
+            {!apiReady ? (
               <div className="flex items-center justify-center h-screen">
-                <Spin size="large" tip="Connecting to API..." />
+                <Spin size="large" tip="Waking up server, please wait..." />
               </div>
-            ) : apiReady ? (
+            ) : (
               <Tabs
                 defaultActiveKey="interviewee"
                 centered
@@ -94,10 +90,6 @@ function App() {
                 }}
                 items={items}
               />
-            ) : (
-              <div className="flex items-center justify-center h-screen text-red-500">
-                Unable to connect to API. Please refresh or try again later.
-              </div>
             )}
           </div>
         </ConfigProvider>
