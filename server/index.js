@@ -12,6 +12,11 @@ app.use(express.json());
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
+app.get("/api/health", (req, res) => {
+  console.log("Health check received");
+  res.sendStatus(200);
+});
+
 // POST /generate-questions
 app.post("/api/generate-questions", async (req, res) => {
   const { role } = req.body;
