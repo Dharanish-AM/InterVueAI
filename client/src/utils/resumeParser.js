@@ -31,15 +31,14 @@ export async function parseResume(file) {
 async function parsePDF(file) {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await getDocument({ data: arrayBuffer }).promise;
-  let text = "";
+  const textPromises = Array.from({ length: pdf.numPages }, (_, i) =>
+    pdf.getPage(i + 1).then((page) => page.getTextContent())
+  );
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    text += textContent.items.map((item) => item.str).join(" ") + "\n";
-  }
-
-  return text;
+  const pages = await Promise.all(textPromises);
+  return pages
+    .map((page) => page.items.map((item) => item.str).join(" "))
+    .join("\n");
 }
 
 async function parseDocx(file) {
@@ -51,16 +50,27 @@ async function parseDocx(file) {
 function extractResumeData(text) {
   const cleanText = text.replace(/\s+/g, " ").trim();
 
-  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-  const emailMatches = cleanText.match(emailRegex);
-  const email = emailMatches ? emailMatches[0] : "";
+  // Extract email
+  const emailMatch = cleanText.match(
+    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/
+  );
+  const email = emailMatch ? emailMatch[0] : "";
 
-  const phoneRegex =
-    /(\+?1?[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/g;
-  const phoneMatches = cleanText.match(phoneRegex);
-  const phone = phoneMatches ? phoneMatches[0].replace(/\D/g, "") : "";
+  // Extract phone and keep only last 10 digits
+  const phoneMatch = cleanText.match(
+    /(\+?\d{1,3}[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/
+  );
+  let phone = phoneMatch ? phoneMatch[0].replace(/\D/g, "") : "";
+  if (phone.length > 10) {
+    phone = phone.slice(-10);
+  }
 
-  const lines = text.split("\n").filter((line) => line.trim());
+  // Extract name efficiently from first 10 lines
+  const lines = text
+    .split("\n")
+    .slice(0, 10)
+    .map((line) => line.trim())
+    .filter(Boolean);
   const excludeKeywords = [
     "resume",
     "cv",
@@ -70,25 +80,17 @@ function extractResumeData(text) {
     "address",
     "@",
   ];
-  let name = "";
+  const name =
+    lines.find(
+      (line) =>
+        line.length > 2 &&
+        line.length < 50 &&
+        !excludeKeywords.some((kw) => line.toLowerCase().includes(kw)) &&
+        !/^\d+/.test(line) &&
+        /^[A-Za-zÀ-ÖØ-öø-ÿ\s.'-]+$/.test(line)
+    ) || "";
 
-  for (const line of lines.slice(0, 5)) {
-    const trimmedLine = line.trim();
-    if (
-      trimmedLine &&
-      trimmedLine.length > 2 &&
-      trimmedLine.length < 50 &&
-      !excludeKeywords.some((keyword) =>
-        trimmedLine.toLowerCase().includes(keyword)
-      ) &&
-      !/^\d+/.test(trimmedLine) &&
-      /^[A-Za-z\s.'-]+$/.test(trimmedLine)
-    ) {
-      name = trimmedLine;
-      break;
-    }
-  }
-
+  // Extract skills
   const skillsSections = [
     "skills",
     "technical skills",
@@ -96,44 +98,35 @@ function extractResumeData(text) {
     "programming languages",
   ];
   let skills = [];
-
+  const lowerText = cleanText.toLowerCase();
   for (const section of skillsSections) {
-    const regex = new RegExp(
-      `${section}[:\\s]*([^\\n]*(?:\\n[^\\n]*){0,5})`,
-      "gi"
-    );
-    const match = cleanText.match(regex);
-    if (match && match[0]) {
-      const skillText = match[0]
-        .replace(new RegExp(section, "gi"), "")
-        .replace(/[:]/g, "");
-      skills = skillText
+    const idx = lowerText.indexOf(section);
+    if (idx !== -1) {
+      const snippet = cleanText.slice(
+        idx + section.length,
+        idx + section.length + 200
+      );
+      skills = snippet
         .split(/[,\n•·]/)
         .map((s) => s.trim())
-        .filter((s) => s && s.length > 1);
+        .filter((s) => s.length > 1);
       break;
     }
   }
 
-  const experienceKeywords = ["years", "experience", "year"];
-  let experience = "";
-
-  for (const keyword of experienceKeywords) {
-    const regex = new RegExp(`(\\d+)\\+?\\s*${keyword}`, "gi");
-    const match = cleanText.match(regex);
-    if (match && match[0]) {
-      experience = match[0];
-      break;
-    }
-  }
+  // Extract experience
+  const experienceMatch = cleanText.match(
+    /(\d+)\+?\s*(years|year|experience)/i
+  );
+  const experience = experienceMatch ? experienceMatch[0] : "";
 
   return {
-    name: name || "",
-    email: email || "",
-    phone: phone || "",
-    skills: skills.slice(0, 10),
-    experience: experience || "",
-    rawText: text.slice(0, 2000),
+    name,
+    email,
+    phone,
+    skills: skills,
+    experience,
+    rawText: text,
     parsedAt: new Date().toISOString(),
   };
 }
@@ -160,6 +153,5 @@ export function validateResumeData(data) {
 }
 
 function isValidEmail(email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

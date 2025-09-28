@@ -1,23 +1,18 @@
 import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8000/api";
-
 export async function generateQuestions(role = "Full-Stack Developer") {
   try {
     const { data } = await axios.post(`${API_BASE_URL}/generate-questions`, {
       role,
     });
 
-    const questions = data.map((q, index) => ({
-      id: index + 1,
-      question: q.question,
-      difficulty: q.difficulty,
-      correctAnswer: q.correctAnswer,
-      timeLimit:
-        q.difficulty === "easy" ? 20 : q.difficulty === "medium" ? 60 : 120,
-    }));
-
-    return questions;
+    if (!Array.isArray(data)) {
+      console.warn("generateQuestions: response is not an array", data);
+      return [];
+    }
+    console.log("Generated questions:", data);
+    return data;
   } catch (error) {
     console.error("Error generating questions:", error);
     return [];
@@ -48,6 +43,7 @@ export async function generateSummary(candidate, answers) {
       candidate,
       answers,
     });
+    console.log("Generated summary:", data);
     return data;
   } catch (error) {
     console.error("Error generating summary:", error);
