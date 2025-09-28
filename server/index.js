@@ -12,17 +12,20 @@ app.use(express.json());
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// Middleware to check API key if needed
+// Middleware to log incoming requests
 app.use((req, res, next) => {
-  // Optional API key check here
+  console.log(`[Request] ${req.method} ${req.url} - Body:`, req.body);
   next();
 });
 
 // POST /generate-questions
 app.post("/api/generate-questions", async (req, res) => {
   const { role } = req.body;
+  console.log("[GenerateQuestions] Generating questions for role:", role);
+
   try {
     const prompt = `Generate 6 interview questions for a ${role} role. 2 easy, 2 medium, 2 hard. Return JSON array [{"question":"...","difficulty":"easy/medium/hard","correctAnswer":"..."}]`;
+    console.log("[GenerateQuestions] Prompt sent to GROQ API:", prompt);
 
     const response = await axios.post(
       GROQ_API_URL,
@@ -38,8 +41,11 @@ app.post("/api/generate-questions", async (req, res) => {
       }
     );
 
+    console.log("[GenerateQuestions] Raw AI response:", response.data);
+
     let content = response.data.choices[0].message.content;
     content = content.replace(/```json|```/g, "").trim();
+    console.log("[GenerateQuestions] Parsed AI content:", content);
 
     let questions;
     try {
@@ -49,7 +55,9 @@ app.post("/api/generate-questions", async (req, res) => {
         timeLimit:
           q.difficulty === "easy" ? 20 : q.difficulty === "medium" ? 60 : 120,
       }));
-    } catch {
+      console.log("[GenerateQuestions] Final questions array:", questions);
+    } catch (parseError) {
+      console.error("[GenerateQuestions] JSON parse failed:", parseError);
       questions = Array.from({ length: 6 }, (_, i) => ({
         id: i + 1,
         question: content,
@@ -61,7 +69,7 @@ app.post("/api/generate-questions", async (req, res) => {
 
     res.json(questions);
   } catch (error) {
-    console.error(error);
+    console.error("[GenerateQuestions] Error:", error);
     res.status(500).json({ error: "Failed to generate questions" });
   }
 });
@@ -69,12 +77,15 @@ app.post("/api/generate-questions", async (req, res) => {
 // POST /score-answer
 app.post("/api/score-answer", async (req, res) => {
   const { question, answer, difficulty } = req.body;
+  console.log("[ScoreAnswer] Scoring answer. Question:", question, "Difficulty:", difficulty);
+
   try {
     const prompt = `Question: ${question}
 Answer: ${answer}
 Difficulty: ${difficulty}
 Score this answer from 0-10 and provide detailed feedback.
 Return JSON: {"score": number, "feedback": "text"}`;
+    console.log("[ScoreAnswer] Prompt sent to GROQ API:", prompt);
 
     const response = await axios.post(
       GROQ_API_URL,
@@ -90,17 +101,25 @@ Return JSON: {"score": number, "feedback": "text"}`;
       }
     );
 
+    console.log("[ScoreAnswer] Raw AI response:", response.data);
+
+    let content = response.data.choices[0].message.content;
+    content = content.replace(/```json|```/g, "").trim();
+    console.log("[ScoreAnswer] Parsed AI content:", content);
+
     let data;
     try {
-      data = JSON.parse(response.data.choices[0].message.content);
-    } catch {
-      data = { score: 5, feedback: response.data.choices[0].message.content };
+      data = JSON.parse(content);
+      console.log("[ScoreAnswer] Parsed JSON data:", data);
+    } catch (parseError) {
+      console.error("[ScoreAnswer] JSON parse failed:", parseError);
+      data = { score: 5, feedback: content };
     }
     data.timestamp = new Date().toISOString();
 
     res.json(data);
   } catch (error) {
-    console.error(error);
+    console.error("[ScoreAnswer] Error:", error);
     res.status(500).json({ error: "Failed to score answer" });
   }
 });
@@ -108,11 +127,14 @@ Return JSON: {"score": number, "feedback": "text"}`;
 // POST /generate-summary
 app.post("/api/generate-summary", async (req, res) => {
   const { candidate, answers } = req.body;
+  console.log("[GenerateSummary] Generating summary for candidate:", candidate);
+
   try {
     const prompt = `Candidate: ${candidate.name} (${candidate.email})
 Answers: ${JSON.stringify(answers)}
 Provide a concise summary of the candidate's performance and suitability for the role.
 Return as plain text.`;
+    console.log("[GenerateSummary] Prompt sent to GROQ API:", prompt);
 
     const response = await axios.post(
       GROQ_API_URL,
@@ -128,10 +150,15 @@ Return as plain text.`;
       }
     );
 
-    const summary = response.data.choices[0].message.content;
-    res.json({ summary });
+    console.log("[GenerateSummary] Raw AI response:", response.data);
+
+    let content = response.data.choices[0].message.content;
+    content = content.replace(/```/g, "").trim();
+    console.log("[GenerateSummary] Cleaned summary content:", content);
+
+    res.json({ summary: content });
   } catch (error) {
-    console.error(error);
+    console.error("[GenerateSummary] Error:", error);
     res.status(500).json({ error: "Failed to generate summary" });
   }
 });
