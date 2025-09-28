@@ -67,4 +67,6 @@ export const {
   clearAllCandidates,
 } = candidateSlice.actions;
 
+export const removeCandidate = candidateSlice.actions.deleteCandidate;
+
 export default candidateSlice.reducer;

@@ -1,14 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import { Table, Card, Button, Input, Select, Space, Tag, Typography, Empty, Statistic, Row, Col } from 'antd';
-import { UserOutlined, SearchOutlined, EyeOutlined, TrophyOutlined, CalendarOutlined, TeamOutlined } from '@ant-design/icons';
+import { useSelector, useDispatch } from 'react-redux';
+import { Table, Card, Button, Input, Select, Space, Tag, Typography, Empty, Statistic, Row, Col, Modal } from 'antd';
+import { UserOutlined, SearchOutlined, EyeOutlined, TrophyOutlined, CalendarOutlined, TeamOutlined, DeleteOutlined } from '@ant-design/icons';
 import CandidateCard from '../components/CandidateCard';
+import { removeCandidate } from '../redux/candidateSlice'; 
 
 const { Title, Text } = Typography;
 const { Search } = Input;
 const { Option } = Select;
 
 const Interviewer = () => {
+  const dispatch = useDispatch();
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
@@ -36,7 +38,6 @@ const Interviewer = () => {
   const filteredCandidates = useMemo(() => {
     let filtered = candidatesWithInterviews;
 
-    
     if (searchTerm) {
       filtered = filtered.filter(candidate =>
         candidate.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -44,12 +45,10 @@ const Interviewer = () => {
       );
     }
 
-    
     if (filterStatus !== 'all') {
       filtered = filtered.filter(candidate => candidate.interviewStatus === filterStatus);
     }
 
-    
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'score':
@@ -94,6 +93,19 @@ const Interviewer = () => {
     return 'red';
   };
 
+  const handleDelete = (candidate) => {
+    Modal.confirm({
+      title: `Delete candidate ${candidate.name}?`,
+      content: "This action cannot be undone.",
+      okText: "Delete",
+      okType: "danger",
+      cancelText: "Cancel",
+      onOk() {
+        dispatch(removeCandidate(candidate.id)); // update Redux state
+      }
+    });
+  };
+
   const columns = [
     {
       title: 'Candidate',
@@ -136,25 +148,55 @@ const Interviewer = () => {
       title: 'Applied',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (date) => new Date(date).toLocaleDateString(),
+      render: (date) => {
+        if (!date) return '-';
+        return new Date(date).toLocaleString('en-US', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      },
     },
     {
       title: 'Completed',
       dataIndex: 'completedAt',
       key: 'completedAt',
-      render: (date) => date ? new Date(date).toLocaleDateString() : '-',
+      render: (date) => {
+        if (!date) return '-';
+        return new Date(date).toLocaleString('en-US', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      },
     },
     {
       title: 'Actions',
       key: 'actions',
       render: (_, record) => (
-        <Button
-          type="primary"
-          icon={<EyeOutlined />}
-          onClick={() => setSelectedCandidate(record)}
-        >
-          View Details
-        </Button>
+        <Space>
+          <Button
+            type="primary"
+            icon={<EyeOutlined />}
+            onClick={() => setSelectedCandidate(record)}
+          >
+            View Details
+          </Button>
+          <Button
+            type="default"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record)}
+          >
+            Delete
+          </Button>
+        </Space>
       ),
     },
   ];
