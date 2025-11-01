@@ -1,0 +1,24 @@
+fastapi
+uvicorn
+
+# LLM + Embedding
+sentence-transformers
+
+# Resume Parsing
+pdfplumber
+
+# HTTP Client
+requests
+
+# Data & Utilities
+pydantic
+python-multipart
+
+# Async + System
+anyio
+
+# (Optional) If using OpenAI fallback
+openai
+
+# Prevent PDF font errors (common Mac/Linux fix)
+Pillow
