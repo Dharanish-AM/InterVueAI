@@ -6,4 +6,5 @@ python-docx
 spacy
 pydantic
 PyMuPDF
+requests
 python-multipart

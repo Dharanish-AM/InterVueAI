@@ -18,7 +18,7 @@ except Exception:
 
 
 import json
-import requests
+import requests # type: ignore
 
 
 class OllamaLLM:
@@ -257,7 +257,7 @@ Resume text:
                 if isinstance(skills_list, list):
                     merged_skills += skills_list
 
-        validated_name = self._validate_name(name_candidate, merged_skills)
+        validated_name = self._validate_name(name_candidate, merged_skills) # type: ignore
         final = {
             "name": validated_name,
             "email": llm_data.get("email") or nlp_data.get("email"),

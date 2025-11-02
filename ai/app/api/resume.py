@@ -5,7 +5,7 @@ router = APIRouter()
 resume_engine = ResumeEngine()
 
 
-@router.post("/parse-resume")
+@router.post("/parse")
 async def parse_resume(file: UploadFile = File(...)):
     filename = file.filename.lower()
 
