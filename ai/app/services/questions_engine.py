@@ -1,5 +1,5 @@
 from typing import Dict, List, Any
-import requests
+import requests # type: ignore
 import logging
 import json
 import re

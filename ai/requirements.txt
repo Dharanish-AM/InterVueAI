@@ -8,3 +8,4 @@ pydantic
 PyMuPDF
 requests
 python-multipart
+sentence_transformers
