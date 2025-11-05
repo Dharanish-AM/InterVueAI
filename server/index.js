@@ -15,6 +15,10 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
+app.use("/user", require("./routes/userRoutes"));
+app.use("/resume", require("./routes/resumeRoutes"));
+app.use("/interview", require("./routes/interviewRoutes"));
+
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
