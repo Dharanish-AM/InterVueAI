@@ -214,7 +214,6 @@ Schema:
   }}
 ],
   "certifications": [],
-  "languages_spoken": [],
   "raw_text": ""
 }}
 
@@ -275,7 +274,6 @@ Resume text:
             "experience": llm_data.get("experience", []),
             "projects": llm_data.get("projects", []),
             "certifications": llm_data.get("certifications", []),
-            "languages_spoken": llm_data.get("languages_spoken", []),
             "raw_text": text
         }
         logger.info("Resume parsing complete")
