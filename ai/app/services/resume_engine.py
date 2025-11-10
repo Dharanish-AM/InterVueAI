@@ -5,8 +5,10 @@ import re
 import os
 from typing import Optional, List
 import spacy  # type: ignore
+import time
 
 import logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ResumeEngine")
 
@@ -18,7 +20,7 @@ except Exception:
 
 
 import json
-import requests # type: ignore
+import requests  # type: ignore
 
 
 class OllamaLLM:
@@ -237,7 +239,9 @@ Resume text:
 
     # -------------------- FULL PIPELINE MERGE -------------------- #
     def parse_resume(self, text: str):
+        start_time = time.time()
         logger.info("Running full resume parse pipeline (NLP + LLM)")
+
         nlp_data = self.nlp_extract(text)
         llm_data = self.llm_parse(text)
 
@@ -256,25 +260,26 @@ Resume text:
                 if isinstance(skills_list, list):
                     merged_skills += skills_list
 
-        validated_name = self._validate_name(name_candidate, merged_skills) # type: ignore
+        validated_name = self._validate_name(name_candidate, merged_skills)  # type: ignore
         final = {
             "name": validated_name,
             "email": llm_data.get("email") or nlp_data.get("email"),
             "phone": llm_data.get("phone") or nlp_data.get("phone"),
             "location": llm_data.get("location", ""),
-            "links": llm_data.get("links", {
-                "github": "",
-                "linkedin": "",
-                "portfolio": "",
-                "other": []
-            }),
+            "links": llm_data.get(
+                "links", {"github": "", "linkedin": "", "portfolio": "", "other": []}
+            ),
             "summary": llm_data.get("summary") or "",
             "skills": llm_data.get("skills", {}),
             "education": llm_data.get("education", []),
             "experience": llm_data.get("experience", []),
             "projects": llm_data.get("projects", []),
             "certifications": llm_data.get("certifications", []),
-            "raw_text": text
+            "raw_text": text,
         }
-        logger.info("Resume parsing complete")
+
+        end_time = time.time()
+        duration = round(end_time - start_time, 2)
+        logger.info(f"Resume parsing complete in {duration} seconds")
+
         return final

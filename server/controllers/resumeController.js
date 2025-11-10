@@ -34,10 +34,17 @@ async function uploadResume(req, res) {
 
     if (resume) {
       if (resume.resumeUrl && fs.existsSync(resume.resumeUrl)) {
-        fs.unlinkSync(resume.resumeUrl);
+        try {
+          fs.unlinkSync(resume.resumeUrl);
+          console.log(`🗑️ Deleted old resume: ${resume.resumeUrl}`);
+        } catch (err) {
+          console.error(`⚠️ Failed to delete old resume: ${err.message}`);
+        }
       }
+
       resume.resumeUrl = resumePath;
       resume.uploadedAt = new Date();
+      resume.parsedData = {};
     } else {
       resume = new Resume({
         userId,
