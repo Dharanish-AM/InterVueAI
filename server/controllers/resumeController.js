@@ -34,7 +34,10 @@ async function uploadResume(req, res) {
     let resume = await Resume.findOne({ userId });
 
     if (resume) {
-      if (resume.resumeUrl && fs.existsSync(path.join(path.dirname(resumePath), resume.resumeUrl))) {
+      if (
+        resume.resumeUrl &&
+        fs.existsSync(path.join(path.dirname(resumePath), resume.resumeUrl))
+      ) {
         try {
           fs.unlinkSync(path.join(path.dirname(resumePath), resume.resumeUrl));
           console.log(`🗑️ Deleted old resume: ${resume.resumeUrl}`);
@@ -43,14 +46,18 @@ async function uploadResume(req, res) {
         }
       }
 
-      resume.resumeUrl = path.relative(path.join(__dirname, "../uploads"), resumePath).replace(/\\/g, "/");
+      resume.resumeUrl = path
+        .relative(path.join(__dirname, "../uploads"), resumePath)
+        .replace(/\\/g, "/");
       resume.resumeUrl = `uploads/${resume.resumeUrl}`;
       resume.uploadedAt = new Date();
       resume.parsedData = {};
     } else {
       resume = new Resume({
         userId,
-        resumeUrl: path.relative(path.join(__dirname, "../uploads"), resumePath).replace(/\\/g, "/"),
+        resumeUrl: path
+          .relative(path.join(__dirname, "../uploads"), resumePath)
+          .replace(/\\/g, "/"),
         uploadedAt: new Date(),
       });
       resume.resumeUrl = `uploads/${resume.resumeUrl}`;
@@ -70,7 +77,7 @@ async function uploadResume(req, res) {
         }
       );
 
-      console.log(aiResponse.data.data)
+      console.log(aiResponse.data.data);
 
       const parsedData = aiResponse.data?.data || {};
 
@@ -99,4 +106,24 @@ async function uploadResume(req, res) {
   }
 }
 
-module.exports = { uploadResume };
+async function viewResume(req, res) {
+  try {
+    const { resumeId } = req.query;
+    const resume = await Resume.findById(resumeId);
+    if (!resume) {
+      return res.status(404).json({ message: "Resume not found." });
+    }
+    const filePath = path.join(__dirname, "../", resume.resumeUrl);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found." });
+    }
+    return res.sendFile(filePath);
+  } catch (error) {
+    console.error("Error viewing resume:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error during resume retrieval." });
+  }
+}
+
+module.exports = { uploadResume, viewResume };

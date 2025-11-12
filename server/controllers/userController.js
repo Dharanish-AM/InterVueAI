@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const { generateToken } = require("../utils/jwt");
+const Resume = require("../models/Resume");
 
 async function signup(req, res) {
   try {
@@ -69,11 +70,22 @@ async function login(req, res) {
 
 async function getUser(req, res) {
   try {
-    const userId = req.user.id;
+    const userId = req.query.id;
     const user = await User.findById(userId).select("-password");
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
+
+    const resume = await Resume.findOne({ userId: userId }).select("-userId");
+    if (resume) {
+      if (resume.resumeUrl && !resume.resumeUrl.startsWith("uploads/")) {
+        const relativePath = resume.resumeUrl.split("uploads/").pop();
+        resume.resumeUrl = `uploads/${relativePath}`;
+      }
+
+      user.resume = resume;
+    }
+
     res.status(200).json(user);
   } catch (error) {
     console.error("Get user error:", error);
