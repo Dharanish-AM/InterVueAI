@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pdfplumber
+docx
+python-docx
+spacy
+pydantic
+PyMuPDF
+requests
+python-multipart
+sentence_transformers
