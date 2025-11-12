@@ -29,28 +29,31 @@ async function uploadResume(req, res) {
     }
 
     const resumePath = req.file.path;
+    const resumeFileName = path.basename(resumePath);
 
     let resume = await Resume.findOne({ userId });
 
     if (resume) {
-      if (resume.resumeUrl && fs.existsSync(resume.resumeUrl)) {
+      if (resume.resumeUrl && fs.existsSync(path.join(path.dirname(resumePath), resume.resumeUrl))) {
         try {
-          fs.unlinkSync(resume.resumeUrl);
+          fs.unlinkSync(path.join(path.dirname(resumePath), resume.resumeUrl));
           console.log(`🗑️ Deleted old resume: ${resume.resumeUrl}`);
         } catch (err) {
           console.error(`⚠️ Failed to delete old resume: ${err.message}`);
         }
       }
 
-      resume.resumeUrl = resumePath;
+      resume.resumeUrl = path.relative(path.join(__dirname, "../uploads"), resumePath).replace(/\\/g, "/");
+      resume.resumeUrl = `uploads/${resume.resumeUrl}`;
       resume.uploadedAt = new Date();
       resume.parsedData = {};
     } else {
       resume = new Resume({
         userId,
-        resumeUrl: resumePath,
+        resumeUrl: path.relative(path.join(__dirname, "../uploads"), resumePath).replace(/\\/g, "/"),
         uploadedAt: new Date(),
       });
+      resume.resumeUrl = `uploads/${resume.resumeUrl}`;
     }
 
     await resume.save();
@@ -76,7 +79,7 @@ async function uploadResume(req, res) {
 
       res.status(200).json({
         message: "Resume uploaded and parsed successfully.",
-        filePath: resumePath,
+        filePath: resume.resumeUrl,
         parsedData,
       });
     } catch (aiError) {
